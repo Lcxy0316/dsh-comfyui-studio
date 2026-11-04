@@ -1,0 +1,29 @@
+# ComfyUI Studio — loader patch.
+#
+# A top-level YAML array of loader patch entries. `insert` appends this plugin's
+# entry to the composition; every field below is overridable from
+# Settings → 插件配置 → ComfyUI Studio, which writes into the profile's
+# cordis.patch.yml user layer.
+#
+# Nothing machine-specific is shipped here on purpose: leave checkpoint, outputDir,
+# comfyuiDir and pythonPath empty, install, then fill them in the settings page
+# (or point at your own values here).
+- insert:
+    - id: comfyui-studio
+      name: dsh-comfyui-studio
+      config:
+        serverUrl: http://127.0.0.1:8188
+        checkpoint: ''
+        width: 832
+        height: 1216
+        steps: 28
+        cfg: 5.5
+        sampler: dpmpp_2m
+        scheduler: karras
+        batchSize: 1
+        outputDir: ''
+        launcherEnabled: true
+        comfyuiDir: ''
+        pythonPath: ''
+        launchArgs: --listen 127.0.0.1 --port 8188 --lowvram --reserve-vram 0.4 --disable-auto-launch
+        preset: low-vram-4g

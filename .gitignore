@@ -1,0 +1,9 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+*.bak-*
+
+# local publish helpers, machine-specific
+push.sh
+ghput.sh
