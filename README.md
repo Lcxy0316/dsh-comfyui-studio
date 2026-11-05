@@ -2,9 +2,9 @@
 
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![dsh](https://img.shields.io/badge/DeepSeek%20Harness-plugin-4B6BFB)](https://github.com/Lcxy0316/dsh-comfyui-studio)
-[![version](https://img.shields.io/badge/version-0.1.0-green)](https://github.com/Lcxy0316/dsh-comfyui-studio/releases)
+[![version](https://img.shields.io/badge/version-0.2.0-green)](https://github.com/Lcxy0316/dsh-comfyui-studio/releases)
 
-在 DeepSeek Harness 里直接调用**本机（或远程）ComfyUI** 出图。全部参数都能在 GUI 里改，改完写回 `cordis.patch.yml`，重启后依然是你的配置。
+在 DeepSeek Harness 里直接调用**本机（或远程）ComfyUI** 出图、出短视频（Wan 2.1 文生视频）。全部参数都能在 GUI 里改，改完写回 `cordis.patch.yml`，重启后依然是你的配置。
 
 - 模型、尺寸、步数、CFG、采样器、调度器、种子、批量 —— 全部可调
 - 提示词可以写在设置里，也可以指向磁盘上的 `.txt`（改文件即改词，不用动插件）
@@ -12,20 +12,23 @@
 - 自带调试面板：探测连通性、读模型列表、试跑一张、中断任务、看显存
 - 硬件预设：4G / 8G / 16G / 远程服务器，一键套用
 - 中英双语，跟随 DSH 主题
-- **不经过任何云端接口**：没有额度消耗，没有内容审核，图片不出本机
+- 视频：Wan 2.1 T2V 1.3B，同一套面板配 UNET / 文本编码器 / VAE，出 mp4 + 自动抽首帧
+- **不经过任何云端接口**：没有额度消耗，没有内容审核，图片与视频都不出本机
 
 ## 实测
 
 RTX 3050 Laptop（4G 显存）+ RealVisXL V4.0 + `--lowvram --reserve-vram 0.4`：
 
-| 分辨率 | 步数 | 耗时 |
-| --- | --- | --- |
-| 512×512 | 8 | 15 秒 |
-| 832×1216 | 28 | 41 秒 |
+| 任务 | 分辨率 | 步数 | 耗时 |
+| --- | --- | --- | --- |
+| 图片 | 512×512 | 8 | 15 秒 |
+| 图片 | 832×1216 | 28 | 41 秒 |
+| 视频 | 256×256 / 9 帧 | 4 | 17 秒（冒烟） |
+| 视频 | 384×384 / 25 帧 | 12 | 39 秒 |
 
 ---
 
-## 1. 它给你两个工具
+## 1. 它给你三个工具
 
 装好之后，模型（也就是我）可以直接调：
 
@@ -47,12 +50,29 @@ RTX 3050 Laptop（4G 显存）+ RealVisXL V4.0 + `--lowvram --reserve-vram 0.4`�
 
 **所有参数都可以省略**，省略就落到设置里的默认值 —— 所以一句 `comfyui_generate({ prompt: "..." })` 就是一次完整调用。
 
+### `comfyui_video`
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `prompt` | string，**必填** | 正向提示词。写清主体、动作、镜头运动 |
+| `negative` | string | 负向提示词，省略用设置默认值 |
+| `width` / `height` | integer | 像素，自动取 16 的倍数（4G 显存建议 480×832） |
+| `frames` | integer | 帧数，4n+1，如 49 |
+| `fps` | integer | 帧率，如 16 |
+| `steps` | integer | 采样步数，Wan 官方用 20 |
+| `cfg` | number | CFG，Wan 官方用 6.0 |
+| `shift` | number | `ModelSamplingSD3` 的 shift，Wan2.1 用 8.0 |
+| `seed` | integer | `-1` 或省略 = 随机 |
+| `filenamePrefix` | string | 落盘文件名前缀 |
+
+返回**两个产物**：mp4 文件和它的首帧 png。原因是对话界面只渲染图片、不会播视频，首帧才是你能直接看到的那张。
+
 ### `comfyui_studio`
 
 | `action` | 作用 |
 | --- | --- |
 | `status` | 检查连通性、ComfyUI 版本、显卡与显存、默认模型、出图目录 |
-| `models` | 列出服务器上所有 checkpoint 与 VAE |
+| `models` | 列出服务器上所有 checkpoint、VAE、UNET 与文本编码器 |
 | `launch` | 启动本机 ComfyUI（用设置里的 python 与参数） |
 | `stop` | 停掉**本插件启动的**那个进程 |
 | `interrupt` | 中断当前正在跑的任务 |
@@ -123,11 +143,25 @@ cp -r dsh-comfyui-studio "$HOME/.dsh/profiles/desktop/node_modules/"
 
 其余字段（尺寸、步数、提示词……）因人而异，但**不改也能跑**。
 
+#### 想用视频，还要多三个模型
+
+Wan 2.1 文生视频不是「一个 checkpoint」，它拆成三个文件，都得放进 ComfyUI 的模型目录：
+
+| 文件 | 放到 | 从哪来 |
+| --- | --- | --- |
+| `wan2.1_t2v_1.3B_fp16.safetensors` | `models/diffusion_models/` | `Comfy-Org/Wan_2.1_ComfyUI_repackaged` → `split_files/diffusion_models/` |
+| `umt5_xxl_fp8_e4m3fn_scaled.safetensors` | `models/text_encoders/` | 同一个仓库 → `split_files/text_encoders/` |
+| `wan_2.1_vae.safetensors` | `models/vae/` | 同一个仓库 → `split_files/vae/` |
+
+国内直连 HuggingFace 一般不通，把域名换成 `hf-mirror.com` 就行。三个文件合计约 9.8 GB。
+
+放完点一次「读取模型」，然后到设置页「视频（Wan 2.1）」这组把三项选上。1.3B 是 4G 显存唯一现实的选择，14B 那档 fp8 也要 12 GB 以上。
+
 ---
 
 ## 3. 配置项全表
 
-设置页按 7 组排列，每个字段下面都有说明。这里只列关键的：
+设置页按 8 组排列，每个字段下面都有说明。这里只列关键的：
 
 ### 连接
 
@@ -176,6 +210,24 @@ SDXL 写实模型的常用组合：`dpmpp_2m` + `karras` + CFG 5–6 + 28 步。
 | `attachToConversation` | `true` | 是否把图内联回对话 |
 | `saveImagesToWorkspace` | `false` | 额外往会话工作区拷一份 |
 | `workspaceFolder` | `comfyui-studio` | 上面那个子目录名 |
+
+### 视频（Wan 2.1）
+
+| 字段 | 默认 | 说明 |
+| --- | --- | --- |
+| `videoUnet` | 空 | `models/diffusion_models` 下，如 `wan2.1_t2v_1.3B_fp16.safetensors` |
+| `videoClip` | 空 | `models/text_encoders` 下，如 `umt5_xxl_fp8_e4m3fn_scaled.safetensors` |
+| `videoVae` | 空 | `models/vae` 下，`wan_2.1_vae.safetensors` |
+| `videoWidth` / `videoHeight` | 480 / 832 | 16 的倍数 |
+| `videoFrames` | 49 | 4n+1；自动对齐 |
+| `videoFps` | 16 | 只影响播放速度 |
+| `videoSteps` / `videoCfg` | 20 / 6.0 | Wan 官方值 |
+| `videoSampler` / `videoScheduler` | `uni_pc` / `simple` | Wan 官方值 |
+| `videoShift` | 8.0 | `ModelSamplingSD3`；2.1 是 8.0，2.2 才是 5.0 |
+
+三个模型名留空是刻意的 —— 别人机器上的文件名不可能是你的。装好点一次「读取模型」，下拉框里就有了。
+
+**显存实话**：Wan2.1 1.3B 在 4G 上能跑，但慢。480×832 / 49 帧 / 20 步是几分钟级别，别指望几十秒。先用 `frames=9`、`steps=4` 摸通链路，再往上加。
 
 ### 启动器
 
@@ -227,6 +279,11 @@ SDXL 写实模型的常用组合：`dpmpp_2m` + `karras` + CFG 5–6 + 28 步。
 | 图片显示不出来 | `outputDir` 不在允许范围内 | 预览只允许读 `outputDir` 和 `workspaceFolder` 下的文件 |
 | 设置改了重启又变回去 | 改的是暂存值没保存 | 点「保存设置」 |
 | 保存报 `Config field ... is not volatile` | 字段没标 volatile | 这是插件 bug，提 issue |
+| 视频报 `还没有配置视频 UNET…` | 三个视频模型没选 | 设置 →「视频（Wan 2.1）」读取模型后选上 |
+| 视频报 `File is corrupt/incomplete` | 模型没下完（很常见） | 核对字节数：unet 2,838,303,560 / clip 6,735,906,897 / vae 253,815,318 |
+| 视频一直是噪声 | 步数太少或 CFG 太低 | 4 步 CFG 1 只适合测链路，正经出片用 20 步 CFG 6 |
+| 视频画面糊、动作抖 | 1.3B 模型的能力上限 | 降到 384×384、加帧数，或换 14B（显存要 12 G 以上） |
+| 显存 OOM | 帧数或分辨率太高 | 4G 卡：≤384×384 / ≤25 帧起步，一帧一帧往上试 |
 
 调试面板会打印每一步的时间戳与结果，出错时先看那里。
 
@@ -239,10 +296,10 @@ SDXL 写实模型的常用组合：`dpmpp_2m` + `karras` + CFG 5–6 + 28 步。
    │  fetch /comfyui-studio/*
    ▼
 宿主（lib/index.js）
-   │  读设置 → resolveConfig → planGeneration
+   │  读设置 → resolveConfig → planGeneration / planVideo
    ▼
 lib/comfy.js
-   │  POST /prompt  →  轮询 /history/{id}  →  GET /view
+   │  POST /prompt  →  轮询 /history/{id}  →  GET /view（每节点取产物）
    ▼
 ComfyUI
 ```
@@ -256,10 +313,10 @@ ComfyUI
 
 | 文件 | 行数 | 内容 |
 | --- | --- | --- |
-| `lib/config.js` | ~350 | schema、默认值、预设、`resolveConfig` |
-| `lib/comfy.js` | ~390 | ComfyUI HTTP 客户端、工作流构造、启动器 |
-| `lib/index.js` | ~760 | 路由、工具、设置读写、出图编排 |
-| `lib/client.js` | ~1090 | 浏览器 UI（设置页 + 药丸） |
+| `lib/config.js` | 426 | schema、默认值、预设、`resolveConfig`、媒体类型判定 |
+| `lib/comfy.js` | 469 | ComfyUI HTTP 客户端、图片/视频工作流构造、启动器 |
+| `lib/index.js` | 1010 | 路由、三个工具、设置读写、出图与出片编排 |
+| `lib/client.js` | 1236 | 浏览器 UI（设置页 + 药丸） |
 
 ---
 
@@ -281,3 +338,5 @@ cp -f lib/*.js "$HOME/.dsh/profiles/desktop/node_modules/dsh-comfyui-studio/lib/
 ## 8. 许可
 
 MIT。拿去改，改完记得把 `serverUrl` / `comfyuiDir` / `pythonPath` 换成自己的。
+
+视频工作流的节点接线参考 ComfyUI 自带的 Wan 模板（`blueprints/`），`ModelSamplingSD3` 的 shift 对 Wan2.1 是 8.0、对 Wan2.2 才是 5.0 —— 抄错会得到一片糊。

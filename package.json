@@ -1,7 +1,7 @@
 {
   "name": "dsh-comfyui-studio",
-  "version": "0.1.0",
-  "description": "ComfyUI studio for DeepSeek Harness: generate images on your own GPU (or a remote ComfyUI) with a full in-app control panel - server probe, model list, hardware presets, launcher, and every parameter editable from the plugin page.",
+  "version": "0.2.0",
+  "description": "ComfyUI studio for DeepSeek Harness: generate images AND short videos (Wan 2.1 text-to-video) on your own GPU or a remote ComfyUI, with a full in-app control panel - server probe, model list, hardware presets, launcher, and every parameter editable from the plugin page.",
   "type": "module",
   "license": "MIT",
   "author": "local",
@@ -42,7 +42,10 @@
     "stable-diffusion",
     "image-generation",
     "local-image-generation",
-    "sdxl"
+    "sdxl",
+    "video-generation",
+    "wan",
+    "text-to-video"
   ],
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.0 <5",
